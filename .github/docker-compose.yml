@@ -1,0 +1,280 @@
+version: '3.8'
+
+services:
+  # ==================== INFRASTRUCTURE ====================
+  
+  # Message Broker - RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: serviciosya-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - serviciosya-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # PostgreSQL - Base de datos principal
+  postgres:
+    image: postgres:15-alpine
+    container_name: serviciosya-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: serviciosya
+      POSTGRES_PASSWORD: serviciosya123
+      POSTGRES_DB: serviciosya_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - serviciosya-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U serviciosya"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Cache y sesiones
+  redis:
+    image: redis:7-alpine
+    container_name: serviciosya-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - serviciosya-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== BACKEND SERVICES ====================
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: serviciosya-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=development
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - CATALOG_SERVICE_URL=http://catalog-service:8002
+      - BOOKING_SERVICE_URL=http://booking-service:8003
+      - ADMIN_SERVICE_URL=http://admin-service:8004
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - serviciosya-network
+    restart: unless-stopped
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    container_name: serviciosya-auth-service
+    ports:
+      - "8001:8001"
+      - "50051:50051"  # gRPC
+    environment:
+      - ENV=development
+      - DATABASE_URL=postgresql://serviciosya:serviciosya123@postgres:5432/serviciosya_db
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRATION=3600
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - serviciosya-network
+    restart: unless-stopped
+
+  # Catalog Service
+  catalog-service:
+    build:
+      context: ./backend/catalog-service
+      dockerfile: Dockerfile
+    container_name: serviciosya-catalog-service
+    ports:
+      - "8002:8002"
+      - "50052:50052"  # gRPC
+    environment:
+      - ENV=development
+      - DATABASE_URL=postgresql://serviciosya:serviciosya123@postgres:5432/serviciosya_db
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+      - AUTH_GRPC_URL=auth-service:50051
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - serviciosya-network
+    restart: unless-stopped
+
+  # Booking Service
+  booking-service:
+    build:
+      context: ./backend/booking-service
+      dockerfile: Dockerfile
+    container_name: serviciosya-booking-service
+    ports:
+      - "8003:8003"
+      - "50053:50053"  # gRPC
+    environment:
+      - ENV=development
+      - DATABASE_URL=postgresql://serviciosya:serviciosya123@postgres:5432/serviciosya_db
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+      - AUTH_GRPC_URL=auth-service:50051
+      - CATALOG_GRPC_URL=catalog-service:50052
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - serviciosya-network
+    restart: unless-stopped
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
+    container_name: serviciosya-notification-service
+    ports:
+      - "8004:8004"
+    environment:
+      - ENV=development
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+      - REDIS_URL=redis://redis:6379
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=your-email@gmail.com
+      - SMTP_PASSWORD=your-app-password
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - serviciosya-network
+    restart: unless-stopped
+
+  # Admin Service
+  admin-service:
+    build:
+      context: ./backend/admin-service
+      dockerfile: Dockerfile
+    container_name: serviciosya-admin-service
+    ports:
+      - "8005:8005"
+    environment:
+      - ENV=development
+      - DATABASE_URL=postgresql://serviciosya:serviciosya123@postgres:5432/serviciosya_db
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+      - AUTH_GRPC_URL=auth-service:50051
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - serviciosya-network
+    restart: unless-stopped
+
+  # ==================== FRONTEND ====================
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: serviciosya-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8003
+    depends_on:
+      - api-gateway
+    networks:
+      - serviciosya-network
+    restart: unless-stopped
+
+  # ==================== MONITORING ====================
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: serviciosya-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - serviciosya-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: serviciosya-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - serviciosya-network
+
+networks:
+  serviciosya-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:

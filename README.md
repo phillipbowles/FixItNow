@@ -1,67 +1,335 @@
-Plan de Arquitectura para el Proyecto "ServiciosYa"
-Este plan propone una Arquitectura de Microservicios para ServiciosYa, alineada con los conceptos de Sistemas Distribuidos (SD) estudiados en el curso, incluyendo Arquitectura, Comunicación y Buenas Prácticas (12Factor).
+# 🚀 FixItNow - Plataforma de Servicios Profesionales
 
-1.⁠ ⁠Arquitectura Propuesta: Microservicios y EDA
-El diseño se basa en una arquitectura de Microservicios para manejar la complejidad inherente a las tres grandes áreas funcionales (Usuarios/Proveedores, Solicitudes, y Administración) y permitir el escalado independiente de cada componente.
+**Proyecto académico de Sistemas Distribuidos** - Arquitectura de Microservicios con Event-Driven Architecture
 
-Componentes Clave (Microservicios)
-Servicio de Autenticación y Perfiles (AuthService):
+## 🏗️ Arquitectura
 
-Maneja el registro, inicio de sesión (usuarios, proveedores, admin) y la gestión de perfiles.
+- **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
+- **Backend**: Python 3.11 + FastAPI (6 microservicios)
+- **Message Broker**: RabbitMQ (Event-Driven Architecture)
+- **Base de Datos**: PostgreSQL 15
+- **Cache**: Redis 7
+- **Orquestación**: Docker Compose / Kubernetes
 
-Modelo Fundamental: Separación de Intereses.
+## 📋 Microservicios
 
-Servicio de Catálogo y Servicios (CatalogService):
+| Servicio | Puerto | Descripción |
+|----------|--------|-------------|
+| **API Gateway** | 8000 | Punto de entrada único, rate limiting, routing |
+| **Auth Service** | 8001 | Autenticación JWT, gestión de usuarios |
+| **Catalog Service** | 8002 | Catálogo de servicios, reviews, búsqueda |
+| **Booking Service** | 8003 | Reservas, WebSockets para chat en tiempo real |
+| **Notification Service** | 8004 | Notificaciones por eventos (EDA) |
+| **Admin Service** | 8005 | Panel administrativo, métricas |
 
-Almacena y gestiona la información de los servicios ofrecidos por los proveedores.
+## 🚀 Inicio Rápido
 
-Servicio de Solicitudes y Reservas (BookingService):
+### Requisitos Previos
 
-Maneja el ciclo de vida de una solicitud de servicio (creación, aceptación, finalización, pago).
+- Docker Desktop (>= 20.10)
+- Docker Compose (>= 2.0)
+- 8GB RAM mínimo
+- 10GB espacio en disco
 
-Servicio de Notificaciones (NotificationService):
+### Instalación
 
-Escucha eventos y envía alertas (email, push, etc.) a usuarios y proveedores.
+```bash
+# 1. Clonar o navegar al proyecto
+cd /Users/manuelperez/Facultad/SistemasDigitales/FixItNow
 
-Servicio de Administración (AdminService):
+# 2. Copiar variables de entorno
+cp .env.example .env
 
-API dedicada para el panel de administración, con acceso a métricas y moderación.
+# 3. Levantar todos los servicios
+docker-compose up -d
 
-Integración y Despliegue
-| Concepto del Curso | Aplicación en ServiciosYa | Tema Cubierto |
-| Orquestación | Usar Kubernetes para el despliegue de cada microservicio, garantizando alta disponibilidad y escalado automático. | TEMA 3 (Kubernetes) |
-| Buenas Prácticas | Cada microservicio debe seguir la metodología 12Factor App (configuración a través de variables de entorno, logs como event streams, separación estricta de las etapas de build/release/run). | TEMA 2 (12Factor) |
-| Aprovisionamiento | Usar Docker y docker-compose para la simulación de la arquitectura en el entorno de desarrollo local. | TEMA 2 (Docker) |
+# 4. Ver logs
+docker-compose logs -f
 
-2.⁠ ⁠Estrategia de Comunicación (TEMA 4)
-Se utilizará una combinación de modelos de comunicación para optimizar la interacción, la eficiencia y la resiliencia del sistema.
+# 5. Verificar estado
+docker-compose ps
+```
 
-A. Comunicación Síncrona (Frontend ↔️ Backend / Service ↔️ Service)
-| Modelo | Uso en ServiciosYa | Ventaja |
-| API Gateway (REST) | Comunicación Externa: El Admin Panel y las aplicaciones móviles de Usuarios/Proveedores se conectarán a un API Gateway que expone APIs REST sencillas para las operaciones CRUD básicas. | Simplicidad y estándar de la web. |
-| gRPC | Comunicación Interna: Para la comunicación de alto rendimiento y baja latencia entre microservicios (Ej: BookingService consulta a AuthService para verificar la identidad del proveedor). | Eficiencia (basado en HTTP/2 y Protocol Buffers). |
-| GraphQL | Opcional para el Frontend: Puede usarse para el catálogo, permitiendo al frontend solicitar solo los datos exactos que necesita, minimizando las consultas. | Minimiza la sobrecarga de datos. |
+### Acceso a la Aplicación
 
-B. Comunicación Asíncrona (Arquitectura Dirigida por Eventos - EDA)
-Se implementará un Message Broker (RabbitMQ o Kafka) para desacoplar los servicios.
+Una vez que todos los servicios estén corriendo:
 
-Publicador de Eventos: El BookingService publica un evento llamado REQUEST_CREATED.
+- 🌐 **Frontend**: http://localhost:3000
+- 📚 **API Gateway**: http://localhost:8000
+- 📖 **API Docs (Swagger)**: http://localhost:8000/docs
+- 🐰 **RabbitMQ Admin**: http://localhost:15672 (admin/admin123)
+- 📊 **Grafana**: http://localhost:3001 (admin/admin123)
+- 🔍 **Prometheus**: http://localhost:9090
 
-Suscriptor de Eventos: El NotificationService y el AdminService (para actualizar métricas) se suscriben al evento REQUEST_CREATED.
+## 👥 Usuarios de Prueba
 
-| Evento de Ejemplo | Publicador | Suscriptores | TEMA Cubierto |
-| SERVICE_REQUESTED | BookingService | NotificationService (avisa al proveedor), AdminService (registra métrica). | TEMA 3 (EDA) |
-| PROFILE_UPDATED | AuthService | CatalogService (actualiza el proveedor del servicio). | TEMA 4 (RabbitMQ/Kafka) |
+La base de datos incluye usuarios de ejemplo (contraseña: `password123`):
 
-C. Comunicación en Tiempo Real (WebSockets)
-| Modelo | Uso en ServiciosYa | Ventaja |
-| WebSockets | Interacciones de Baja Latencia: Usado para funciones clave como Chat en Vivo entre el Proveedor y el Usuario una vez aceptada una solicitud, o para Actualizaciones de Estado en Vivo (ej., "El proveedor está en camino"). | Comunicación bidireccional y persistente (full-duplex), ideal para tiempo real. |
+- **Admin**: `admin@fixitnow.com`
+- **Proveedor**: `juan.perez@email.com`
+- **Usuario**: `carlos.rodriguez@email.com`
 
-3.⁠ ⁠Enfoque para el Trabajo Práctico Obligatorio (30%)
-El plan anterior aborda directamente las áreas requeridas para el informe final del proyecto:
+## 📊 Base de Datos
 
-| Requisito del Informe | Cómo lo aborda el Plan |
-| Características Clave y Modelos Fundamentales | Cobertura de las características de los SD (tolerancia a fallos, escalabilidad) mediante Microservicios, y modelos como Cliente-Servidor y P2P (aunque el P2P es bajo el enfoque de Microservicios). |
-| Arquitectura | Propuesta formal de Microservicios y Arquitectura Dirigida por Eventos (EDA), detallando los servicios, la orquestación con Kubernetes y las buenas prácticas de 12Factor. |
-| Comunicación Distribuida | Uso de gRPC (síncrona interna de alto rendimiento), RabbitMQ/Kafka (asíncrona con EDA) y WebSockets (tiempo real) para demostrar el uso de múltiples tecnologías de comunicación. |
-| Monitorización y Observabilidad | Los logs de cada servicio, siguiendo el principio de 12Factor, serán gestionados centralmente (ej. por Prometheus/Grafana) junto con las métricas publicadas por los servicios, garantizando la Observabilidad. |
+Ver el **diagrama interactivo** completo en los artifacts de la conversación.
+
+### Tablas Principales
+
+- `users` - Usuarios, proveedores y administradores
+- `services` - Catálogo de servicios ofrecidos
+- `bookings` - Solicitudes y reservas de servicios
+- `reviews` - Reseñas y calificaciones
+
+## 🎓 Conceptos de Sistemas Distribuidos Aplicados
+
+### ✅ Arquitectura de Microservicios
+- **Separación de responsabilidades**: 6 servicios independientes
+- **Escalabilidad horizontal**: Cada servicio puede escalarse independientemente
+- **Resiliencia**: Fallo de un servicio no afecta al sistema completo
+- **Despliegue independiente**: Deploy sin downtime
+
+### ✅ Event-Driven Architecture (EDA)
+- **Message Broker**: RabbitMQ con Topic Exchange
+- **Publicación/Suscripción**: Servicios desacoplados mediante eventos
+- **Eventos**:
+  - `user.registered` → Notification Service
+  - `booking.service_requested` → Notification + Admin Services
+  - `booking.status_changed` → Notification Service
+  - `catalog.review_created` → Notification Service
+
+### ✅ Comunicación Distribuida
+
+| Tipo | Tecnología | Uso |
+|------|------------|-----|
+| **Síncrona** | REST API | Frontend ↔ API Gateway |
+| **Síncrona** | gRPC (opcional) | Microservicio ↔ Microservicio |
+| **Asíncrona** | RabbitMQ | Event-Driven Architecture |
+| **Tiempo Real** | WebSockets | Chat en vivo bidireccional |
+
+### ✅ 12Factor App
+
+| Factor | Implementación |
+|--------|----------------|
+| I. Codebase | Git repository único |
+| III. Config | Variables de entorno (.env) |
+| VI. Procesos | Servicios stateless |
+| VII. Port binding | Cada servicio en su puerto |
+| VIII. Concurrencia | Async/await, múltiples workers |
+| XI. Logs | Logs como event streams (stdout) |
+| XII. Admin | Scripts de inicialización |
+
+### ✅ Contenedorización y Orquestación
+- **Docker**: Cada servicio en su contenedor
+- **Docker Compose**: Orquestación local
+- **Kubernetes**: Manifiestos para producción (ver `/infrastructure/kubernetes`)
+
+### ✅ Observabilidad
+- **Logs**: Centralizados con timestamps
+- **Métricas**: Prometheus para recolección
+- **Visualización**: Grafana dashboards
+- **Health Checks**: Endpoints `/` en cada servicio
+
+## 📁 Estructura del Proyecto
+
+```
+FixItNow/
+├── docker-compose.yml          # Orquestación de servicios
+├── .env.example                # Variables de entorno
+├── README.md
+│
+├── backend/
+│   ├── api-gateway/           # Puerto 8000 - Gateway unificado
+│   ├── auth-service/          # Puerto 8001 - Autenticación
+│   ├── catalog-service/       # Puerto 8002 - Catálogo
+│   ├── booking-service/       # Puerto 8003 - Reservas + WebSockets
+│   ├── notification-service/  # Puerto 8004 - Notificaciones (EDA)
+│   └── admin-service/         # Puerto 8005 - Panel admin
+│
+├── frontend/                  # Next.js
+│   ├── app/                  # Pages
+│   ├── components/           # Componentes React
+│   └── stores/               # State management (Zustand)
+│
+└── infrastructure/
+    ├── db/
+    │   └── init.sql          # Schema + datos de ejemplo
+    ├── kubernetes/           # Manifiestos K8s
+    └── monitoring/           # Prometheus + Grafana
+```
+
+## 🔧 Comandos Útiles
+
+### Docker Compose
+
+```bash
+# Levantar servicios
+docker-compose up -d
+
+# Detener servicios
+docker-compose down
+
+# Ver logs de todos los servicios
+docker-compose logs -f
+
+# Ver logs de un servicio específico
+docker-compose logs -f auth-service
+
+# Reiniciar un servicio
+docker-compose restart booking-service
+
+# Reconstruir imágenes
+docker-compose build --no-cache
+
+# Eliminar todo (incluye volúmenes)
+docker-compose down -v
+```
+
+### Testing
+
+```bash
+# Probar API Gateway
+curl http://localhost:8000/
+
+# Probar Auth Service
+curl http://localhost:8001/
+
+# Probar login
+curl -X POST http://localhost:8000/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin@fixitnow.com&password=password123"
+```
+
+## 🧪 Testing del Chat en Tiempo Real
+
+El Booking Service incluye WebSockets para chat bidireccional:
+
+```javascript
+// JavaScript client example
+const ws = new WebSocket('ws://localhost:8003/ws/bookings/1/chat?user_id=1');
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({ message: 'Hola!' }));
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Received:', data);
+};
+```
+
+## 📈 Escalado
+
+### Horizontal
+
+```bash
+# Escalar un servicio a 3 réplicas
+docker-compose up -d --scale auth-service=3
+```
+
+### Kubernetes
+
+```bash
+# Aplicar manifiestos
+kubectl apply -f infrastructure/kubernetes/
+
+# Ver pods
+kubectl get pods
+
+# Escalar deployment
+kubectl scale deployment auth-service --replicas=5
+```
+
+## 🛡️ Seguridad
+
+- ✅ Autenticación JWT
+- ✅ Passwords hasheados con bcrypt
+- ✅ CORS configurado
+- ✅ Rate limiting en API Gateway
+- ✅ Validación de datos con Pydantic
+- ✅ SQL Injection protection (ORM)
+
+## 🔄 Flujo de Usuario Típico
+
+1. **Registro/Login** → Auth Service genera JWT
+2. **Buscar Servicios** → Catalog Service con cache Redis
+3. **Crear Solicitud** → Booking Service + evento a RabbitMQ
+4. **Notificación** → Notification Service recibe evento y envía email
+5. **Chat en Vivo** → WebSocket bidireccional en Booking Service
+6. **Completar Servicio** → Estado actualizado + evento
+7. **Dejar Review** → Catalog Service actualiza rating
+
+## 🐛 Troubleshooting
+
+### Servicios no inician
+
+```bash
+# Ver logs detallados
+docker-compose logs -f
+
+# Verificar salud de infraestructura
+docker-compose ps postgres redis rabbitmq
+```
+
+### Base de datos no se inicializa
+
+```bash
+# Recrear volúmenes
+docker-compose down -v
+docker-compose up -d postgres
+sleep 10
+docker-compose up -d
+```
+
+### Puerto en uso
+
+```bash
+# Ver qué usa el puerto
+lsof -i :3000
+
+# Cambiar puerto en docker-compose.yml
+```
+
+## 📚 Recursos
+
+- [FastAPI Docs](https://fastapi.tiangolo.com)
+- [Next.js Docs](https://nextjs.org/docs)
+- [RabbitMQ Tutorials](https://www.rabbitmq.com/getstarted.html)
+- [SQLAlchemy Async](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html)
+- [12Factor App](https://12factor.net/)
+
+## 👨‍💻 Desarrollo
+
+### Agregar un nuevo microservicio
+
+1. Crear carpeta en `backend/nuevo-servicio/`
+2. Agregar `Dockerfile`, `requirements.txt`, `main.py`
+3. Agregar al `docker-compose.yml`
+4. Conectar a RabbitMQ para eventos
+5. Actualizar API Gateway routing
+
+### Agregar una nueva página frontend
+
+1. Crear en `frontend/app/nueva-pagina/page.tsx`
+2. Usar componentes compartidos de `frontend/components/`
+3. Gestionar estado con Zustand si es necesario
+
+## 📝 Licencia
+
+MIT License - Proyecto Académico
+
+## 🎓 Autor
+
+**Manuel Pérez** - Sistemas Distribuidos 2025  
+Universidad: Facultad de Ingeniería
+
+## 🙏 Agradecimientos
+
+- Curso de Sistemas Distribuidos
+- Documentación de FastAPI, Next.js, RabbitMQ
+- Comunidad open source
+
+---
+
+**FixItNow** - Conectando usuarios con profesionales de calidad 🛠️
+
+*Proyecto académico demostrando conceptos de Sistemas Distribuidos, Microservicios y Event-Driven Architecture*

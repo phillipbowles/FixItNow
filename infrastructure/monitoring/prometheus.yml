@@ -1,0 +1,49 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'fixitnow'
+    environment: 'production'
+
+scrape_configs:
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8000']
+        labels:
+          service: 'api-gateway'
+          tier: 'gateway'
+
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8001']
+        labels:
+          service: 'auth-service'
+          tier: 'backend'
+
+  - job_name: 'catalog-service'
+    static_configs:
+      - targets: ['catalog-service:8002']
+        labels:
+          service: 'catalog-service'
+          tier: 'backend'
+
+  - job_name: 'booking-service'
+    static_configs:
+      - targets: ['booking-service:8003']
+        labels:
+          service: 'booking-service'
+          tier: 'backend'
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:8004']
+        labels:
+          service: 'notification-service'
+          tier: 'backend'
+
+  - job_name: 'admin-service'
+    static_configs:
+      - targets: ['admin-service:8005']
+        labels:
+          service: 'admin-service'
+          tier: 'backend'
