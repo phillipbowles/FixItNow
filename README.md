@@ -313,20 +313,12 @@ lsof -i :3000
 2. Usar componentes compartidos de `frontend/components/`
 3. Gestionar estado con Zustand si es necesario
 
-## 📝 Licencia
 
-MIT License - Proyecto Académico
+## 🎓 Autores
 
-## 🎓 Autor
-
-**Manuel Pérez** - Sistemas Distribuidos 2025  
+**Joaquin Porteiro, Phillip Bowles y Manuel Pérez** - Sistemas Distribuidos 2025  
 Universidad: Facultad de Ingeniería
 
-## 🙏 Agradecimientos
-
-- Curso de Sistemas Distribuidos
-- Documentación de FastAPI, Next.js, RabbitMQ
-- Comunidad open source
 
 ---
 
