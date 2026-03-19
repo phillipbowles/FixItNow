@@ -1,0 +1,121 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PROVIDER
+  CONSUMER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  phone     String
+  address   String?
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  services     Service[] @relation("ProviderServices")
+  bookings     Booking[] @relation("ConsumerBookings")
+  sentMessages Message[] @relation("UserMessages")
+
+  @@map("users")
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  price       Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  providerId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  provider       User           @relation("ProviderServices", fields: [providerId], references: [id], onDelete: Cascade)
+  availabilities Availability[]
+  bookings       Booking[]
+
+  @@map("services")
+}
+
+model Availability {
+  id        String    @id @default(uuid())
+  serviceId String
+  dayOfWeek DayOfWeek
+  startTime String // Format: "HH:mm" (e.g., "09:00")
+  endTime   String // Format: "HH:mm" (e.g., "17:00")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("availabilities")
+}
+
+model Booking {
+  id         String        @id @default(uuid())
+  serviceId  String
+  consumerId String
+  date       DateTime // Fecha específica de la reserva
+  startTime  String // Format: "HH:mm"
+  endTime    String // Format: "HH:mm"
+  status     BookingStatus @default(PENDING)
+  notes      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  // Relations
+  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  consumer User      @relation("ConsumerBookings", fields: [consumerId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@map("bookings")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  bookingId String
+  senderId  String
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sender  User    @relation("UserMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}

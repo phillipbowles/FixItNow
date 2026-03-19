@@ -1,0 +1,60 @@
+# Docker Compose para Backend Standalone
+# Este archivo permite construir y ejecutar SOLO el backend + postgres
+# Útil para desarrollo cuando el frontend ya está corriendo localmente
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fixitnow-postgres-backend
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: fixitnow
+      POSTGRES_PASSWORD: fixitnow123
+      POSTGRES_DB: fixitnow
+    volumes:
+      - postgres_backend_data:/var/lib/postgresql/data
+    networks:
+      - fixitnow-backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fixitnow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fixitnow-backend-standalone
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    environment:
+      DATABASE_URL: postgresql://fixitnow:fixitnow123@postgres:5432/fixitnow?schema=public
+      JWT_SECRET: your-secret-key-change-in-production
+      JWT_EXPIRES_IN: 7d
+      PORT: 8000
+      NODE_ENV: production
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fixitnow-backend-network
+    command: sh -c "npx prisma migrate deploy && npm run start:prod"
+
+volumes:
+  postgres_backend_data:
+
+networks:
+  fixitnow-backend-network:
+    driver: bridge
+
+# Nota: Este compose incluye backend + postgres
+# NO incluye el frontend
+#
+# Para levantar el stack completo (frontend + backend + postgres),
+# usa el docker-compose.yml de la raíz del proyecto:
+# cd .. && docker-compose up

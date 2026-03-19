@@ -1,0 +1,25 @@
+# Dockerfile para desarrollo (con hot reload)
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copiar archivos de dependencias
+COPY package.json package-lock.json ./
+
+# Instalar dependencias
+RUN npm ci
+
+# Copiar prisma schema
+COPY prisma ./prisma/
+
+# Generar Prisma Client
+RUN npx prisma generate
+
+# Copiar el resto del código
+COPY . .
+
+# Exponer puerto 3000 para la app y 9229 para debugging
+EXPOSE 8000 9229
+
+# Comando de desarrollo con hot reload
+CMD ["npm", "run", "start:dev"]
