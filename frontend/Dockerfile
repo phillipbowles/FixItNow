@@ -50,10 +50,6 @@ RUN chown -R nextjs:nodejs /app
 # Cambiar a usuario no-root
 USER nextjs
 
-# Exponer puerto 3000
-EXPOSE 3000
-
-ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Comando de inicio

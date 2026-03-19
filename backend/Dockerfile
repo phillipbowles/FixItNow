@@ -41,8 +41,5 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Expose port
-EXPOSE 8000
-
 # Start application
 CMD ["npm", "run", "start:prod"]
